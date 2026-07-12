@@ -21,6 +21,7 @@ Large language models are powerful, but they have two problems: they sometimes i
 - **Two-stage retrieval** — hybrid search (vector + BM25 fused with Reciprocal Rank Fusion) followed by cross-encoder re-ranking, the same architecture web search engines use
 - **Measured, not assumed** — a built-in evaluation harness with a golden dataset proves what each retrieval stage contributes (see the benchmark below)
 - **Retrieval regression gate in CI** — a pull request that degrades retrieval quality fails the build automatically
+- **Retrieval traces on every question** — what dense search, BM25, fusion, and the re-ranker each ranked where, with latencies; shown in the web app ("Why this answer?"), returned by the API, printed by the CLI, and logged as JSON
 - **Grounded answers with citations** — the LLM answers only from retrieved context; every answer lists the file and chunk it was built from
 - **Multi-format ingestion** — reads `.pdf`, `.docx`, `.txt`, and `.md` files into a persistent local ChromaDB index
 - **Three interfaces, one core** — a CLI, a documented REST API with token streaming (SSE), and a web chat app
@@ -121,6 +122,26 @@ python -m eval.run              # benchmark all three configurations
 python -m eval.run --verbose    # also list missed questions
 python -m eval.run --check      # regression gate (what CI runs)
 ```
+
+**An honest caveat about these numbers:** the golden questions and the corpus were written by the same author, with the corpus open — so the absolute scores are optimistic (real user questions are messier than these). The numbers are trustworthy for what they are used for here: *comparing configurations against each other* on identical inputs. Treat them as relative, not absolute.
+
+## Debugging: Why Did It Answer That?
+
+Every question produces a **retrieval trace**: what each stage ranked where, with scores and latencies. The web app shows it under "Why this answer?", the API returns it in the `trace` field, the server logs it as one JSON line, and the CLI prints it on demand:
+
+```text
+$ python main.py ask "What is YOLOv7?" --show-trace
+...
+=== RETRIEVAL TRACE (hybrid, 412.3 ms) ===
+dense           38.8 ms  top: yolov7_paper.pdf_chunk_2(-0.399), chunk_73(-0.404), ...
+bm25             0.6 ms  top: sample.txt_chunk_0(6.25), yolov7_paper.pdf_chunk_2(4.76), ...
+rrf_fusion       0.1 ms  top: yolov7_paper.pdf_chunk_2(0.0325), chunk_73(0.032), ...
+rerank         371.2 ms  top: yolov7_paper.pdf_chunk_0(5.96), chunk_65(4.28), ...
+```
+
+With a trace, "the answer is wrong" becomes "the evidence was rank 3 after fusion and the re-ranker demoted it to rank 10" — a statement that names the component, the mechanism, and the fix.
+
+That exact sentence is not hypothetical. This repository's own benchmark contains a question that hybrid search answers correctly and re-ranking breaks. **[Anatomy of a Retrieval Failure](docs/anatomy-of-a-retrieval-failure.md)** dissects it stage by stage with real scores — why the cross-encoder demotes the right chunk, which four fixes were considered, and why "accept and document" won. If you read one file in this repository, read that one.
 
 ## Installation
 
@@ -238,7 +259,10 @@ rag-document-qa/
 │   ├── store.py         # ChromaDB vector index + BM25 keyword index
 │   ├── ranking.py       # Reciprocal Rank Fusion + cross-encoder re-ranker
 │   ├── retriever.py     # Two-stage retrieval pipeline
+│   ├── trace.py         # Per-query retrieval traces (observability)
 │   └── pipeline.py      # Retrieval + grounded generation with citations
+├── docs/
+│   └── anatomy-of-a-retrieval-failure.md   # Real failure, dissected stage by stage
 ├── eval/
 │   ├── corpus/          # Fixed evaluation corpus (5 documents)
 │   ├── golden.jsonl     # 25 questions labeled with their evidence
@@ -272,6 +296,9 @@ All settings have sensible defaults and can be overridden in `.env`:
 | `USE_RERANKER` | `true` | Re-score candidates with a cross-encoder |
 | `RERANKER_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local re-ranking model |
 | `TOP_K` | `4` | Chunks handed to the LLM per question |
+| `LLM_TIMEOUT` | `60` | Seconds before an LLM call is abandoned |
+| `LLM_MAX_RETRIES` | `3` | Automatic retries with backoff on 429/5xx |
+| `MAX_UPLOAD_MB` | `25` | Upload size limit for `/ingest` |
 | `TEMPERATURE` | `0.2` | Lower = more factual answers |
 | `MAX_TOKENS` | `512` | Maximum answer length |
 
@@ -284,6 +311,7 @@ Choices an engineer would ask about, and the reasoning behind them:
 - **BM25 index rebuilt in memory at startup.** Honest trade-off: fine at this scale, wasteful at millions of chunks — a production system would keep the keyword index in a search engine (OpenSearch, Elasticsearch). The seam is isolated in `store.py` so that swap touches one module.
 - **The golden set is small (25 questions) and the corpus is fixed.** That is enough to expose real differences between configurations (see the miss the re-ranker introduced) while staying reviewable by a human in one sitting. A bigger blind set would be better science; this size is the right cost/benefit for the project.
 - **Chunks of 500 characters with 100 overlap** are a measured default, not a truth. Change them and re-run `python -m eval.run` — that workflow, not the numbers, is the point.
+- **Traces over dashboards.** Observability here is one JSON line per query with per-stage ranks, scores, and latencies — enough to answer "why did it retrieve that?" without any infrastructure. A production deployment would ship these lines to its existing log pipeline; the trace format is the part worth keeping.
 
 ## Testing
 
