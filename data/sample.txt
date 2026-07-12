@@ -1,0 +1,21 @@
+Retrieval-Augmented Generation (RAG) is a technique that combines information
+retrieval with large language models. Instead of relying only on what the model
+learned during training, a RAG system first searches a knowledge base for text
+that is relevant to the user's question. The retrieved text is then given to
+the language model as context, and the model writes its answer using only that
+context.
+
+RAG systems have three main stages. The first stage is ingestion: documents
+are read, split into small overlapping chunks, converted into numerical
+vectors called embeddings, and stored in a vector database. The second stage
+is retrieval: when a user asks a question, the question is also converted into
+an embedding, and the database returns the chunks whose embeddings are most
+similar to it. The third stage is generation: the retrieved chunks and the
+question are sent to a large language model, which produces a grounded answer.
+
+The main benefits of RAG are accuracy and traceability. Because the model
+answers from real documents, it is far less likely to invent facts, a problem
+known as hallucination. Because every answer can cite the exact chunks it was
+built from, users can verify the sources themselves. RAG also lets a system
+answer questions about private or very recent documents that the model never
+saw during training, without any expensive fine-tuning.
