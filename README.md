@@ -4,9 +4,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**An evaluation-first RAG system.** Ask questions about your own documents and get grounded, source-cited answers — from a retrieval pipeline where every stage is benchmarked, traced, and protected by a regression gate in CI.
+**An evaluation-first RAG system.** Ask questions about your own documents and get grounded, source-cited answers — from a pipeline where every architectural decision is measured before it is trusted.
 
-Most RAG repositories show you *how to build* a pipeline. This one also shows you how to **measure** it, **debug** it, and **decide** whether each component earns its place. The benchmark below includes a case where adding a "better" model made one answer worse — and a [full dissection](docs/anatomy-of-a-retrieval-failure.md) of why.
+Hundreds of repositories show how to *build* a RAG pipeline. This one answers the questions that come after building one:
+
+- **How do you know your retrieval works?** A golden dataset and two deterministic metrics benchmark every configuration — results in the table below.
+- **What does each component actually buy?** Hybrid search lifted hit rate from 0.96 to 1.00. Re-ranking lifted MRR from 0.87 to 0.92 — and broke one question doing it.
+- **How do you debug a wrong answer?** Every question returns a retrieval trace showing what each stage ranked where, so a failure names its own cause.
+- **How do you keep quality from silently regressing?** CI fails any change that drops retrieval below measured thresholds.
+
+If you build or maintain RAG systems, the most useful file here is [Anatomy of a Retrieval Failure](docs/anatomy-of-a-retrieval-failure.md) — a real regression from this repository's own benchmark, dissected stage by stage.
 
 ![Demo: asking a question in the Streamlit chat app and receiving a streamed, source-cited answer](assets/demo.gif)
 
@@ -113,7 +120,7 @@ python -m eval.run --verbose    # also list missed questions
 python -m eval.run --check      # regression gate (what CI runs)
 ```
 
-**An honest caveat:** the golden questions and the corpus were written by the same author, with the corpus open — so the absolute scores are optimistic (real user questions are messier). The numbers are trustworthy for what they are used for here: *comparing configurations* on identical inputs. Treat them as relative, not absolute.
+**How to read these numbers.** These are reproducible comparisons *within this repository*, not universal RAG benchmarks — the corpus, questions, and metrics are fixed so that architectural changes can be compared under identical conditions. Two things follow. First, treat the numbers as relative: "hybrid beats dense here" is trustworthy; "this system scores 0.96" in general is not. Second, the absolute scores are optimistic, because the golden questions and the corpus were written by the same author (real user questions are messier). This is the same discipline production teams apply: a fixed internal benchmark to compare changes, refreshed with real user queries over time.
 
 ## Debugging: Why Did It Answer That?
 
@@ -250,6 +257,17 @@ Choices an engineer would ask about, and the reasoning behind them:
 - **The golden set is small (25 questions) and the corpus is fixed.** Enough to expose real differences between configurations — including the regression the re-ranker introduced — while staying reviewable by a human in one sitting.
 - **Chunks of 500 characters with 100 overlap** are a measured default, not a truth. The workflow (change, re-measure), not the numbers, is the point.
 - **Traces over dashboards.** Observability here is one JSON line per query with per-stage ranks, scores, and latencies — enough to answer "why did it retrieve that?" with no infrastructure. A production deployment would ship these lines to its existing log pipeline.
+
+## Lessons Learned
+
+The lessons from building this that transfer to any RAG system:
+
+1. **Without evaluation, every decision is a guess.** Chunk size, search mode, how many chunks to retrieve — each changes answer quality in ways that eyeballing a few queries cannot detect. A golden set of even 25 questions turns "I think this helps" into "this moved MRR from 0.87 to 0.92."
+2. **A better component is not better everywhere.** The cross-encoder improved the aggregate score and broke one specific question. Aggregate metrics hide individual regressions — keep per-question results, not just averages.
+3. **Retrieval failures localize to stages.** "The answer is wrong" is not actionable. "The evidence was rank 3 after fusion and the re-ranker demoted it to rank 10" names the component, the mechanism, and the fix. Build the trace before you need it — retrofitting observability during an incident is the expensive way.
+4. **Combine methods with complementary weaknesses.** Dense search misses exact terms; BM25 misses synonyms. Together they scored 1.00 hit rate where each alone missed questions. The best single method usually loses to two mediocre methods that fail differently.
+5. **Off-the-shelf models import their training data's biases.** The re-ranker prefers definitional, heading-style passages because that is what MS MARCO taught it. Every pretrained model carries its training distribution into your system — evaluation on *your* data is how you find out where.
+6. **Keep the failures you cannot fix.** The broken question stays in the golden set. It costs nothing, documents a known limitation, and becomes a free regression test for the next re-ranker tried.
 
 ## Testing
 
