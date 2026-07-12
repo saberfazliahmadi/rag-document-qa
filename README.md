@@ -2,7 +2,9 @@
 
 Ask questions about your own documents and get answers with source citations.
 
-This project is a complete Retrieval-Augmented Generation (RAG) pipeline built in Python. You give it documents (PDF, Word, text, or Markdown). It stores them in a local vector database. Then you ask questions in plain language, and a large language model answers **using only your documents** — and tells you exactly which parts of which files the answer came from.
+This project is a complete Retrieval-Augmented Generation (RAG) system built in Python, with three interfaces: a **command-line tool**, a **FastAPI REST API** with token streaming, and a **Streamlit chat app**. You give it documents (PDF, Word, text, or Markdown). It stores them in a local vector database. Then you ask questions in plain language, and a large language model answers **using only your documents** — and tells you exactly which parts of which files the answer came from.
+
+![Demo: asking a question in the Streamlit chat app and receiving a streamed, source-cited answer](assets/demo.gif)
 
 ## Why RAG?
 
@@ -16,7 +18,9 @@ Large language models are powerful, but they have two problems: they sometimes i
 - **Source citations** — every answer lists the file and chunk it was built from
 - **Persistent local vector store** — ChromaDB keeps your index on disk between runs; re-ingesting a file updates it instead of duplicating it
 - **No secrets in code** — all configuration comes from environment variables
-- **Simple CLI** — ingest, ask a single question, or chat interactively
+- **Three interfaces** — a CLI, a documented REST API, and a web chat app
+- **Token streaming** — answers appear word by word in the web app, via Server-Sent Events
+- **Interactive API docs** — auto-generated OpenAPI documentation at `/docs`
 
 ## Tech Stack
 
@@ -26,6 +30,8 @@ Large language models are powerful, but they have two problems: they sometimes i
 | Vector database | ChromaDB (persistent, local) |
 | Embeddings | Sentence-Transformers (`all-MiniLM-L6-v2`) |
 | LLM access | OpenRouter (OpenAI-compatible API) |
+| REST API | FastAPI + Uvicorn (with SSE streaming) |
+| Web app | Streamlit |
 | Document parsing | PyPDF2, python-docx |
 | Configuration | python-dotenv |
 
@@ -53,9 +59,15 @@ Each module owns one stage:
 - `rag/loaders.py` — reads files into plain text
 - `rag/splitter.py` — cuts text into overlapping chunks
 - `rag/store.py` — embeds chunks and stores/queries them in ChromaDB
-- `rag/pipeline.py` — retrieves context and generates the cited answer
+- `rag/pipeline.py` — retrieves context and generates the cited answer (plain or streaming)
 - `rag/config.py` — loads all settings from the environment
-- `main.py` — the command-line interface
+
+The core `rag/` package contains no interface code, so all three interfaces share it:
+
+```
+Streamlit chat app (app.py)  ──HTTP──▶  FastAPI REST API (api.py)  ──▶  rag/ package
+CLI (main.py)  ──────────────────────────────────────────────────────▶  rag/ package
+```
 
 ## Installation
 
@@ -90,6 +102,28 @@ cp .env.example .env
 Open `.env` and set `OPENROUTER_API_KEY` to your key from [openrouter.ai/keys](https://openrouter.ai/keys). The default model is free to use.
 
 ## Usage
+
+### Web interface (recommended)
+
+Start the API, then the chat app (two terminals):
+
+```bash
+uvicorn api:app
+streamlit run app.py
+```
+
+Open http://localhost:8501, upload a document in the sidebar, and start asking questions. Answers stream in word by word, each with an expandable list of sources.
+
+The REST API can also be used on its own — interactive documentation lives at http://127.0.0.1:8000/docs:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/ingest` | POST | Upload a document (multipart file) |
+| `/ask` | POST | Ask a question, get a JSON answer with sources |
+| `/ask/stream` | POST | Same, but the answer streams token by token (SSE) |
+| `/status` | GET | Chunk count and configured models |
+
+### Command line
 
 **Ingest documents** (any mix of PDF, DOCX, TXT, MD):
 
@@ -142,6 +176,8 @@ The first run downloads the embedding model (about 90 MB), so it takes a little 
 ```
 rag-document-qa/
 ├── main.py              # Command-line interface
+├── api.py               # FastAPI REST API (ingest, ask, stream, status)
+├── app.py               # Streamlit chat client (talks to the API)
 ├── rag/
 │   ├── __init__.py
 │   ├── config.py        # Settings loaded from environment variables
@@ -151,6 +187,8 @@ rag-document-qa/
 │   └── pipeline.py      # Retrieval + generation with citations
 ├── data/
 │   └── sample.txt       # Small demo document
+├── assets/
+│   └── demo.gif         # Animated demo of the web app
 ├── .env.example         # Configuration template (copy to .env)
 ├── requirements.txt
 ├── LICENSE
@@ -178,9 +216,9 @@ All settings have sensible defaults and can be overridden in `.env`:
 
 - Hybrid search (combine keyword and semantic retrieval)
 - Answer evaluation with Ragas (faithfulness and relevance scores)
-- A web interface with Streamlit or FastAPI
 - Support for more formats (HTML, CSV) and OCR for scanned PDFs
 - Sentence-aware chunking instead of fixed character windows
+- Multi-user support with per-user collections and authentication
 
 ## License
 
