@@ -3,21 +3,21 @@
 import os
 
 import docx
-import PyPDF2
+import pypdf
 
 SUPPORTED_EXTENSIONS = (".txt", ".md", ".pdf", ".docx")
 
 
 def read_text_file(file_path: str) -> str:
     """Return the content of a plain text or Markdown file."""
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_path, encoding="utf-8") as file:
         return file.read()
 
 
 def read_pdf_file(file_path: str) -> str:
     """Extract text from every page of a PDF file."""
     with open(file_path, "rb") as file:
-        reader = PyPDF2.PdfReader(file)
+        reader = pypdf.PdfReader(file)
         return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 

@@ -1,6 +1,6 @@
 chromadb>=1.5
 openai>=2.0
-PyPDF2>=3.0
+pypdf>=5.0
 python-docx>=1.0
 python-dotenv>=1.0
 sentence-transformers>=5.0

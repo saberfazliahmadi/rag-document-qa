@@ -59,6 +59,14 @@ class Settings:
     max_tokens: int = field(default_factory=lambda: int(os.getenv("MAX_TOKENS", "512")))
     top_k: int = field(default_factory=lambda: int(os.getenv("TOP_K", "4")))
 
+    # Reliability: LLM APIs fail with 429s and 5xxs in normal operation.
+    # The OpenAI SDK retries those with exponential backoff when asked.
+    llm_timeout: float = field(default_factory=lambda: float(os.getenv("LLM_TIMEOUT", "60")))
+    llm_max_retries: int = field(default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "3")))
+
+    # Ingestion guardrail: reject uploads larger than this (megabytes).
+    max_upload_mb: int = field(default_factory=lambda: int(os.getenv("MAX_UPLOAD_MB", "25")))
+
     def require_api_key(self) -> None:
         """Fail fast with a clear message when the API key is missing."""
         if not self.api_key:
