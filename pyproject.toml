@@ -1,3 +1,13 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["rag_env", ".venv", "chroma_db"]
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes, I: import order, B: common bug patterns,
+# UP: outdated syntax, SIM: needless complexity.
+select = ["E", "F", "I", "B", "UP", "SIM"]

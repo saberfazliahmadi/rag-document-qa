@@ -84,7 +84,7 @@ class CrossEncoderReranker:
                 chunk_index=chunk.chunk_index,
                 score=float(score),
             )
-            for chunk, score in zip(candidates, scores)
+            for chunk, score in zip(candidates, scores, strict=True)
         ]
         rescored.sort(key=lambda chunk: chunk.score, reverse=True)
         return rescored[:top_k]

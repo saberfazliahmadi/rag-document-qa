@@ -97,7 +97,10 @@ def main() -> None:
     store = build_store(base)
     check_answerable(store, golden)
 
-    print(f"\nCorpus: {store.count()} chunks | Golden questions: {len(golden)} | top_k={args.top_k}\n")
+    print(
+        f"\nCorpus: {store.count()} chunks | "
+        f"Golden questions: {len(golden)} | top_k={args.top_k}\n"
+    )
     print(f"{'configuration':<24} {'hit_rate@' + str(args.top_k):>12} {'MRR':>8}")
     print("-" * 46)
 

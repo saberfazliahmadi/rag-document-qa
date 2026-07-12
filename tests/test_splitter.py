@@ -17,7 +17,7 @@ def test_adjacent_chunks_overlap():
     text = " ".join(f"word{i}" for i in range(300))
     chunks = split_text(text, chunk_size=200, chunk_overlap=50)
     assert len(chunks) > 2
-    for previous, current in zip(chunks, chunks[1:]):
+    for previous, current in zip(chunks, chunks[1:], strict=False):
         if len(current) >= 60:
             # The tail of each chunk must reappear inside the next one.
             assert previous[-30:] in current

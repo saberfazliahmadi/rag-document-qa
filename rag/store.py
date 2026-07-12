@@ -117,7 +117,9 @@ class VectorStore:
                 # other stage in the pipeline.
                 score=-distance,
             )
-            for chunk_id, text, meta, distance in zip(ids, documents, metadatas, distances)
+            for chunk_id, text, meta, distance in zip(
+                ids, documents, metadatas, distances, strict=True
+            )
         ]
 
     def search_keyword(self, query: str, top_k: int) -> list[RetrievedChunk]:
@@ -162,7 +164,7 @@ class VectorStore:
                 chunk_index=meta.get("chunk", -1),
                 score=0.0,
             )
-            for chunk_id, text, meta in zip(ids, documents, metadatas)
+            for chunk_id, text, meta in zip(ids, documents, metadatas, strict=True)
         ]
         corpus = [_tokenize(chunk.text) for chunk in self._bm25_chunks]
         self._bm25 = BM25Okapi(corpus) if corpus else None
