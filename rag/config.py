@@ -40,6 +40,20 @@ class Settings:
     chunk_size: int = field(default_factory=lambda: int(os.getenv("CHUNK_SIZE", "500")))
     chunk_overlap: int = field(default_factory=lambda: int(os.getenv("CHUNK_OVERLAP", "100")))
 
+    # Retrieval
+    # "dense" = vector search only; "hybrid" = vector + BM25 merged with RRF.
+    search_mode: str = field(default_factory=lambda: os.getenv("SEARCH_MODE", "hybrid"))
+    # How many candidates the first stage retrieves before the final top_k cut.
+    candidates: int = field(default_factory=lambda: int(os.getenv("CANDIDATES", "20")))
+    use_reranker: bool = field(
+        default_factory=lambda: os.getenv("USE_RERANKER", "true").lower() in ("1", "true", "yes")
+    )
+    reranker_model: str = field(
+        default_factory=lambda: os.getenv(
+            "RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+    )
+
     # Generation
     temperature: float = field(default_factory=lambda: float(os.getenv("TEMPERATURE", "0.2")))
     max_tokens: int = field(default_factory=lambda: int(os.getenv("MAX_TOKENS", "512")))

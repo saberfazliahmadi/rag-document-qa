@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from openai import OpenAI
 
 from .config import Settings
-from .store import VectorStore
+from .retriever import Retriever
+from .store import RetrievedChunk, VectorStore
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant for retrieval-augmented generation (RAG).\n"
@@ -30,25 +31,19 @@ class RagPipeline:
     def __init__(self, settings: Settings, store: VectorStore):
         settings.require_api_key()
         self.settings = settings
-        self.store = store
+        self.retriever = Retriever(settings, store)
         self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
 
     def ask(self, question: str, top_k: int | None = None) -> RagResult:
         """Answer a question using only the ingested documents.
-
-        Args:
-            question: The user's natural-language question.
-            top_k: How many chunks to retrieve (defaults to the configured value).
 
         Returns:
             A RagResult with the generated answer and its sources. If no
             relevant context is found, the answer explains that instead of
             letting the model guess.
         """
-        results = self.store.search(question, top_k or self.settings.top_k)
-        context, sources = self._format_context(results)
-
-        if not context.strip():
+        chunks = self.retriever.retrieve(question, top_k)
+        if not chunks:
             return RagResult(
                 answer="No relevant context was found in the ingested documents.",
                 sources=[],
@@ -56,14 +51,14 @@ class RagPipeline:
 
         response = self.client.chat.completions.create(
             model=self.settings.model,
-            messages=self._build_messages(context, question),
+            messages=self._build_messages(chunks, question),
             temperature=self.settings.temperature,
             max_tokens=self.settings.max_tokens,
         )
 
         content = response.choices[0].message.content
         answer = content.strip() if content else "The model returned an empty response."
-        return RagResult(answer=answer, sources=sources)
+        return RagResult(answer=answer, sources=self._citations(chunks))
 
     def ask_stream(self, question: str, top_k: int | None = None) -> tuple[Iterator[str], list[str]]:
         """Answer a question, streaming the answer token by token.
@@ -71,17 +66,15 @@ class RagPipeline:
         Retrieval happens up front, so the sources are known before
         generation starts. Returns the token iterator and the source list.
         """
-        results = self.store.search(question, top_k or self.settings.top_k)
-        context, sources = self._format_context(results)
-
-        if not context.strip():
+        chunks = self.retriever.retrieve(question, top_k)
+        if not chunks:
             no_context = "No relevant context was found in the ingested documents."
             return iter([no_context]), []
 
         def token_stream() -> Iterator[str]:
             stream = self.client.chat.completions.create(
                 model=self.settings.model,
-                messages=self._build_messages(context, question),
+                messages=self._build_messages(chunks, question),
                 temperature=self.settings.temperature,
                 max_tokens=self.settings.max_tokens,
                 stream=True,
@@ -91,11 +84,12 @@ class RagPipeline:
                 if delta:
                     yield delta
 
-        return token_stream(), sources
+        return token_stream(), self._citations(chunks)
 
     @staticmethod
-    def _build_messages(context: str, question: str) -> list[dict]:
+    def _build_messages(chunks: list[RetrievedChunk], question: str) -> list[dict]:
         """Assemble the chat messages sent to the LLM."""
+        context = "\n\n".join(chunk.text for chunk in chunks)
         return [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -105,22 +99,12 @@ class RagPipeline:
         ]
 
     @staticmethod
-    def _format_context(results: dict) -> tuple[str, list[str]]:
-        """Join retrieved chunks into one context block and collect unique sources."""
-        documents = (results.get("documents") or [[]])[0]
-        metadatas = (results.get("metadatas") or [[]])[0]
-
-        if not documents:
-            return "", []
-
-        context = "\n\n".join(documents)
-
-        sources: list[str] = []
+    def _citations(chunks: list[RetrievedChunk]) -> list[str]:
+        """Unique citations, preserving retrieval order."""
         seen: set[str] = set()
-        for meta in metadatas:
-            label = f"{meta.get('source', '?')} (chunk {meta.get('chunk', '?')})"
-            if label not in seen:
-                seen.add(label)
-                sources.append(label)
-
-        return context, sources
+        citations = []
+        for chunk in chunks:
+            if chunk.citation not in seen:
+                seen.add(chunk.citation)
+                citations.append(chunk.citation)
+        return citations
