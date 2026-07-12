@@ -1,5 +1,7 @@
 # Anatomy of a Retrieval Failure
 
+**English** | [فارسی](anatomy-of-a-retrieval-failure.fa.md)
+
 This is a debugging walkthrough of a real failure in this repository's own
 benchmark — not a hypothetical. The evaluation harness reports that the
 `hybrid + re-ranking` configuration misses one golden question that plain
