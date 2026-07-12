@@ -1,0 +1,25 @@
+{"question": "What happens if I index documents with one embedding model and embed queries with a different one?", "evidence": "silently breaks retrieval", "source": "embeddings.md"}
+{"question": "How many dimensions do all-MiniLM-L6-v2 vectors have?", "evidence": "384-dimensional", "source": "embeddings.md"}
+{"question": "Why do embeddings struggle with product codes and rare acronyms?", "evidence": "they can lose exact identifiers", "source": "embeddings.md"}
+{"question": "Which similarity measure compares the angle between vectors and ignores their length?", "evidence": "compares the angle between two vectors", "source": "embeddings.md"}
+{"question": "What does the efSearch parameter control?", "evidence": "how wide the search fans out at query time", "source": "vector-databases.md"}
+{"question": "What is a common default value for efConstruction?", "evidence": "efConstruction set to 200", "source": "vector-databases.md"}
+{"question": "What does HNSW stand for?", "evidence": "Hierarchical Navigable Small World", "source": "vector-databases.md"}
+{"question": "When is it worth moving from ChromaDB to a dedicated engine like Qdrant or Milvus?", "evidence": "millions of vectors", "source": "vector-databases.md"}
+{"question": "Why is it dangerous to pass top vector search results to an LLM without checking scores?", "evidence": "hand it irrelevant context", "source": "vector-databases.md"}
+{"question": "What chunk size and overlap does this project use by default?", "evidence": "500 characters per chunk with a 100-character overlap", "source": "chunking.md"}
+{"question": "Why do adjacent chunks share overlapping text?", "evidence": "appears complete in at least one chunk", "source": "chunking.md"}
+{"question": "What is small-to-big retrieval?", "evidence": "small-to-big retrieval indexes small chunks", "source": "chunking.md"}
+{"question": "What is the downside of very large chunks?", "evidence": "embed vaguely", "source": "chunking.md"}
+{"question": "What is the main weakness of BM25?", "evidence": "it cannot see synonyms", "source": "retrieval-methods.md"}
+{"question": "How does Reciprocal Rank Fusion avoid comparing incompatible score scales?", "evidence": "using only ranks", "source": "retrieval-methods.md"}
+{"question": "What value is the RRF damping constant conventionally set to?", "evidence": "conventionally set to 60", "source": "retrieval-methods.md"}
+{"question": "Why is a cross-encoder more accurate than comparing separate embeddings?", "evidence": "reads both texts jointly", "source": "retrieval-methods.md"}
+{"question": "Which re-ranking model does this project use?", "evidence": "ms-marco-MiniLM-L-6-v2", "source": "retrieval-methods.md"}
+{"question": "What does hit rate at k measure?", "evidence": "top k retrieved chunks", "source": "evaluation.md"}
+{"question": "How is Mean Reciprocal Rank calculated?", "evidence": "1/rank for the first relevant chunk", "source": "evaluation.md"}
+{"question": "What is faithfulness in RAG evaluation?", "evidence": "supported by the retrieved context", "source": "evaluation.md"}
+{"question": "How should a client handle HTTP 429 errors from an LLM API?", "evidence": "exponential backoff", "source": "production-ops.md"}
+{"question": "Why do RAG applications stream answers over Server-Sent Events?", "evidence": "sees the answer forming within a second", "source": "production-ops.md"}
+{"question": "What should be logged to debug why a RAG system gave a particular answer?", "evidence": "retrieved chunk IDs and their scores", "source": "production-ops.md"}
+{"question": "How can a malicious document attack a RAG system?", "evidence": "tries to override the system prompt", "source": "production-ops.md"}
