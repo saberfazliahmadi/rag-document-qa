@@ -54,8 +54,27 @@ def stream_answer(question: str):
             event = json.loads(line[len("data: "):])
             if event["type"] == "sources":
                 st.session_state.last_sources = event["sources"]
+                st.session_state.last_trace = event.get("trace", {})
             elif event["type"] == "token":
                 yield event["text"]
+
+
+def render_trace(trace: dict) -> None:
+    """Show what each retrieval stage ranked where — the 'why this answer?' view."""
+    if not trace:
+        return
+    with st.expander(f"Why this answer? (retrieval trace, {trace.get('total_ms', '?')} ms)"):
+        st.caption(
+            f"mode: {trace.get('search_mode')} · re-ranked: {trace.get('reranked')}"
+        )
+        for stage in trace.get("stages", []):
+            rows = [
+                {"rank": i + 1, "chunk": r["id"], "score": r["score"]}
+                for i, r in enumerate(stage["results"])
+            ]
+            st.markdown(f"**{stage['stage']}** — {stage['latency_ms']} ms")
+            if rows:
+                st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
 # --- Sidebar: connection status and document upload ------------------------------
@@ -104,6 +123,7 @@ if question := st.chat_input("Ask a question about your documents"):
 
     with st.chat_message("assistant"):
         st.session_state.last_sources = []
+        st.session_state.last_trace = {}
         try:
             answer = st.write_stream(stream_answer(question))
         except requests.RequestException as error:
@@ -115,6 +135,7 @@ if question := st.chat_input("Ask a question about your documents"):
             with st.expander("Sources"):
                 for i, source in enumerate(sources, 1):
                     st.markdown(f"{i}. `{source}`")
+        render_trace(st.session_state.get("last_trace", {}))
 
     st.session_state.messages.append(
         {"role": "assistant", "content": str(answer), "sources": sources}

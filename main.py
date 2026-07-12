@@ -36,9 +36,20 @@ def cmd_ingest(store: VectorStore, files: list[str]) -> None:
             print(f"Skipped '{file_path}': {error}")
 
 
-def cmd_ask(settings: Settings, store: VectorStore, question: str) -> None:
+def print_trace(trace: dict) -> None:
+    """Render the retrieval trace: what each stage ranked where, and how fast."""
+    print(f"\n=== RETRIEVAL TRACE ({trace['search_mode']}, {trace['total_ms']} ms) ===")
+    for stage in trace["stages"]:
+        top = ", ".join(f"{r['id']}({r['score']})" for r in stage["results"][:4])
+        print(f"{stage['stage']:<12} {stage['latency_ms']:>7} ms  top: {top}")
+
+
+def cmd_ask(settings: Settings, store: VectorStore, question: str, show_trace: bool) -> None:
     pipeline = RagPipeline(settings, store)
-    print_result(pipeline.ask(question))
+    result = pipeline.ask(question)
+    print_result(result)
+    if show_trace:
+        print_trace(result.trace)
 
 
 def cmd_chat(settings: Settings, store: VectorStore) -> None:
@@ -71,6 +82,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = subparsers.add_parser("ask", help="Ask a single question")
     ask.add_argument("question", help="The question to answer")
+    ask.add_argument(
+        "--show-trace",
+        action="store_true",
+        help="Print what each retrieval stage ranked where, with latencies",
+    )
 
     subparsers.add_parser("chat", help="Interactive Q&A session")
     subparsers.add_parser("status", help="Show vector store statistics")
@@ -86,7 +102,7 @@ def main() -> int:
     if args.command == "ingest":
         cmd_ingest(store, args.files)
     elif args.command == "ask":
-        cmd_ask(settings, store, args.question)
+        cmd_ask(settings, store, args.question, args.show_trace)
     elif args.command == "chat":
         cmd_chat(settings, store)
     elif args.command == "status":

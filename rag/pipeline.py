@@ -1,13 +1,17 @@
 """The core RAG pipeline: retrieve relevant chunks, then generate a grounded answer."""
 
+import json
+import logging
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from openai import OpenAI
 
 from .config import Settings
 from .retriever import Retriever
 from .store import RetrievedChunk, VectorStore
+
+trace_logger = logging.getLogger("rag.trace")
 
 SYSTEM_PROMPT = (
     "You are a helpful assistant for retrieval-augmented generation (RAG).\n"
@@ -19,10 +23,13 @@ SYSTEM_PROMPT = (
 
 @dataclass
 class RagResult:
-    """The answer to a question together with its source citations."""
+    """The answer to a question together with its source citations and
+
+    the retrieval trace explaining how the context was chosen."""
 
     answer: str
     sources: list[str]
+    trace: dict = field(default_factory=dict)
 
 
 class RagPipeline:
@@ -32,7 +39,12 @@ class RagPipeline:
         settings.require_api_key()
         self.settings = settings
         self.retriever = Retriever(settings, store)
-        self.client = OpenAI(base_url=settings.base_url, api_key=settings.api_key)
+        self.client = OpenAI(
+            base_url=settings.base_url,
+            api_key=settings.api_key,
+            timeout=settings.llm_timeout,
+            max_retries=settings.llm_max_retries,
+        )
 
     def ask(self, question: str, top_k: int | None = None) -> RagResult:
         """Answer a question using only the ingested documents.
@@ -42,11 +54,13 @@ class RagPipeline:
             relevant context is found, the answer explains that instead of
             letting the model guess.
         """
-        chunks = self.retriever.retrieve(question, top_k)
+        chunks, trace = self.retriever.retrieve_traced(question, top_k)
+        self._log_trace(trace)
         if not chunks:
             return RagResult(
                 answer="No relevant context was found in the ingested documents.",
                 sources=[],
+                trace=trace.to_dict(),
             )
 
         response = self.client.chat.completions.create(
@@ -56,20 +70,31 @@ class RagPipeline:
             max_tokens=self.settings.max_tokens,
         )
 
-        content = response.choices[0].message.content
-        answer = content.strip() if content else "The model returned an empty response."
-        return RagResult(answer=answer, sources=self._citations(chunks))
+        # Providers occasionally return error-shaped payloads with no choices
+        # (rate limiting, upstream incidents) — surface that clearly instead
+        # of crashing.
+        if not response.choices:
+            error = getattr(response, "error", None) or "no choices in response"
+            answer = f"The model returned no answer ({error}). Please try again."
+        else:
+            content = response.choices[0].message.content
+            answer = content.strip() if content else "The model returned an empty response."
+        return RagResult(answer=answer, sources=self._citations(chunks), trace=trace.to_dict())
 
-    def ask_stream(self, question: str, top_k: int | None = None) -> tuple[Iterator[str], list[str]]:
+    def ask_stream(
+        self, question: str, top_k: int | None = None
+    ) -> tuple[Iterator[str], list[str], dict]:
         """Answer a question, streaming the answer token by token.
 
-        Retrieval happens up front, so the sources are known before
-        generation starts. Returns the token iterator and the source list.
+        Retrieval happens up front, so the sources and the retrieval trace
+        are known before generation starts. Returns the token iterator, the
+        source list, and the trace.
         """
-        chunks = self.retriever.retrieve(question, top_k)
+        chunks, trace = self.retriever.retrieve_traced(question, top_k)
+        self._log_trace(trace)
         if not chunks:
             no_context = "No relevant context was found in the ingested documents."
-            return iter([no_context]), []
+            return iter([no_context]), [], trace.to_dict()
 
         def token_stream() -> Iterator[str]:
             stream = self.client.chat.completions.create(
@@ -84,7 +109,12 @@ class RagPipeline:
                 if delta:
                     yield delta
 
-        return token_stream(), self._citations(chunks)
+        return token_stream(), self._citations(chunks), trace.to_dict()
+
+    @staticmethod
+    def _log_trace(trace) -> None:
+        """Emit the trace as one JSON line, collectable by any log pipeline."""
+        trace_logger.info(json.dumps(trace.to_dict()))
 
     @staticmethod
     def _build_messages(chunks: list[RetrievedChunk], question: str) -> list[dict]:

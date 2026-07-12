@@ -10,12 +10,15 @@ context window the LLM actually sees.
 
 This split is deliberate: recall problems and precision problems have
 different fixes, and separating the stages makes each one measurable
-(see eval/).
+(see eval/) and observable (see rag/trace.py).
 """
+
+import time
 
 from .config import Settings
 from .ranking import CrossEncoderReranker, reciprocal_rank_fusion
 from .store import RetrievedChunk, VectorStore
+from .trace import RetrievalTrace, StageTimer
 
 
 class Retriever:
@@ -34,19 +37,43 @@ class Retriever:
 
     def retrieve(self, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
         """Return the top_k most relevant chunks for the query."""
+        chunks, _ = self.retrieve_traced(query, top_k)
+        return chunks
+
+    def retrieve_traced(
+        self, query: str, top_k: int | None = None
+    ) -> tuple[list[RetrievedChunk], RetrievalTrace]:
+        """Retrieve chunks and record what every stage saw along the way."""
         top_k = top_k or self.settings.top_k
-        candidates = self._candidates(query)
+        trace = RetrievalTrace(
+            query=query,
+            search_mode=self.settings.search_mode,
+            reranked=self.reranker is not None,
+        )
+        started = time.perf_counter()
+
+        n = self.settings.candidates
+        with StageTimer() as timer:
+            dense = self.store.search_dense(query, n)
+        trace.add_stage("dense", timer.elapsed_ms, dense)
+
+        if self.settings.search_mode == "hybrid":
+            with StageTimer() as timer:
+                keyword = self.store.search_keyword(query, n)
+            trace.add_stage("bm25", timer.elapsed_ms, keyword)
+
+            with StageTimer() as timer:
+                candidates = reciprocal_rank_fusion([dense, keyword])
+            trace.add_stage("rrf_fusion", timer.elapsed_ms, candidates)
+        else:
+            candidates = dense
 
         if self.reranker is not None:
-            return self.reranker.rerank(query, candidates, top_k)
-        return candidates[:top_k]
+            with StageTimer() as timer:
+                final = self.reranker.rerank(query, candidates, top_k)
+            trace.add_stage("rerank", timer.elapsed_ms, final)
+        else:
+            final = candidates[:top_k]
 
-    def _candidates(self, query: str) -> list[RetrievedChunk]:
-        n = self.settings.candidates
-        dense = self.store.search_dense(query, n)
-
-        if self.settings.search_mode == "dense":
-            return dense
-
-        keyword = self.store.search_keyword(query, n)
-        return reciprocal_rank_fusion([dense, keyword])
+        trace.total_ms = (time.perf_counter() - started) * 1000
+        return final, trace

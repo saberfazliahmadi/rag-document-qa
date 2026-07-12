@@ -7,6 +7,7 @@ Interactive documentation is served at http://127.0.0.1:8000/docs
 """
 
 import json
+import logging
 import os
 import tempfile
 from contextlib import asynccontextmanager
@@ -20,7 +21,6 @@ from rag.loaders import SUPPORTED_EXTENSIONS
 from rag.pipeline import RagPipeline
 from rag.store import VectorStore
 
-
 # --- Request / response schemas -------------------------------------------------
 
 
@@ -32,6 +32,9 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     answer: str
     sources: list[str]
+    # Per-stage retrieval trace: what dense search, BM25, fusion, and the
+    # re-ranker each saw, with scores and latencies. See rag/trace.py.
+    trace: dict
 
 
 class IngestResponse(BaseModel):
@@ -52,6 +55,7 @@ class StatusResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the embedding model and vector store once, at startup."""
+    logging.basicConfig(level=logging.INFO)  # make rag.trace JSON lines visible
     settings = Settings()
     store = VectorStore(settings)
     app.state.settings = settings
@@ -98,12 +102,20 @@ async def ingest(file: UploadFile) -> IngestResponse:
             f"Supported: {', '.join(SUPPORTED_EXTENSIONS)}",
         )
 
+    content = await file.read()
+    max_bytes = app.state.settings.max_upload_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds the {app.state.settings.max_upload_mb} MB upload limit.",
+        )
+
     # Persist the upload to a temporary file so the loaders can read it by path.
     # The original filename is kept so citations point to a recognizable source.
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = os.path.join(tmp_dir, os.path.basename(filename))
         with open(tmp_path, "wb") as tmp_file:
-            tmp_file.write(await file.read())
+            tmp_file.write(content)
         chunks_added = app.state.store.add_document(tmp_path)
 
     return IngestResponse(file=filename, chunks_added=chunks_added)
@@ -113,7 +125,7 @@ async def ingest(file: UploadFile) -> IngestResponse:
 def ask(request: AskRequest) -> AskResponse:
     """Answer a question using only the ingested documents."""
     result = app.state.pipeline.ask(request.question, request.top_k)
-    return AskResponse(answer=result.answer, sources=result.sources)
+    return AskResponse(answer=result.answer, sources=result.sources, trace=result.trace)
 
 
 @app.post("/ask/stream", tags=["question-answering"])
@@ -122,10 +134,10 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
 
     Event order: one `sources` event first, then `token` events, then `done`.
     """
-    tokens, sources = app.state.pipeline.ask_stream(request.question, request.top_k)
+    tokens, sources, trace = app.state.pipeline.ask_stream(request.question, request.top_k)
 
     def event_stream():
-        yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+        yield f"data: {json.dumps({'type': 'sources', 'sources': sources, 'trace': trace})}\n\n"
         for token in tokens:
             yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"

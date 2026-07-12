@@ -23,14 +23,22 @@ class FakeSettings:
     collection_name = "documents"
     embedding_model = "fake-embedder"
     model = "fake-llm"
+    max_upload_mb = 25
+
+
+FAKE_TRACE = {"query": "q", "search_mode": "hybrid", "reranked": True, "stages": []}
 
 
 class FakePipeline:
     def ask(self, question: str, top_k=None) -> RagResult:
-        return RagResult(answer=f"answer to: {question}", sources=["doc.txt (chunk 0)"])
+        return RagResult(
+            answer=f"answer to: {question}",
+            sources=["doc.txt (chunk 0)"],
+            trace=FAKE_TRACE,
+        )
 
     def ask_stream(self, question: str, top_k=None):
-        return iter(["streamed ", "answer"]), ["doc.txt (chunk 0)"]
+        return iter(["streamed ", "answer"]), ["doc.txt (chunk 0)"], FAKE_TRACE
 
 
 @pytest.fixture()
@@ -55,6 +63,7 @@ def test_ask_returns_answer_with_sources(client):
     body = response.json()
     assert body["answer"] == "answer to: What is RAG?"
     assert body["sources"] == ["doc.txt (chunk 0)"]
+    assert body["trace"]["search_mode"] == "hybrid"
 
 
 def test_ask_rejects_empty_question(client):
@@ -74,6 +83,13 @@ def test_ingest_accepts_supported_format(client):
 def test_ingest_rejects_unsupported_format(client):
     response = client.post("/ingest", files={"file": ("data.csv", b"a,b")})
     assert response.status_code == 415
+
+
+def test_ingest_rejects_oversized_file(client):
+    app.state.settings.max_upload_mb = 1
+    too_big = b"x" * (1024 * 1024 + 1)
+    response = client.post("/ingest", files={"file": ("big.txt", too_big)})
+    assert response.status_code == 413
 
 
 def test_stream_emits_sources_then_tokens_then_done(client):
