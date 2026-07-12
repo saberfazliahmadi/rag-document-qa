@@ -4,3 +4,10 @@ PyPDF2>=3.0
 python-docx>=1.0
 python-dotenv>=1.0
 sentence-transformers>=5.0
+
+# Web interface
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
+streamlit>=1.40
+requests>=2.31
