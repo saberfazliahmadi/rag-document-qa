@@ -1,0 +1,28 @@
+# Secrets
+.env
+
+# Virtual environments
+.venv/
+venv/
+rag_env/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Vector database (generated at runtime)
+chroma_db/
+
+# Local documents (users bring their own)
+data/*
+!data/sample.txt
+!data/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
