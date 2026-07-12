@@ -1,5 +1,6 @@
 """The core RAG pipeline: retrieve relevant chunks, then generate a grounded answer."""
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from openai import OpenAI
@@ -55,13 +56,7 @@ class RagPipeline:
 
         response = self.client.chat.completions.create(
             model=self.settings.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Context:\n{context}\n\nQuestion: {question}\nAnswer:",
-                },
-            ],
+            messages=self._build_messages(context, question),
             temperature=self.settings.temperature,
             max_tokens=self.settings.max_tokens,
         )
@@ -69,6 +64,45 @@ class RagPipeline:
         content = response.choices[0].message.content
         answer = content.strip() if content else "The model returned an empty response."
         return RagResult(answer=answer, sources=sources)
+
+    def ask_stream(self, question: str, top_k: int | None = None) -> tuple[Iterator[str], list[str]]:
+        """Answer a question, streaming the answer token by token.
+
+        Retrieval happens up front, so the sources are known before
+        generation starts. Returns the token iterator and the source list.
+        """
+        results = self.store.search(question, top_k or self.settings.top_k)
+        context, sources = self._format_context(results)
+
+        if not context.strip():
+            no_context = "No relevant context was found in the ingested documents."
+            return iter([no_context]), []
+
+        def token_stream() -> Iterator[str]:
+            stream = self.client.chat.completions.create(
+                model=self.settings.model,
+                messages=self._build_messages(context, question),
+                temperature=self.settings.temperature,
+                max_tokens=self.settings.max_tokens,
+                stream=True,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    yield delta
+
+        return token_stream(), sources
+
+    @staticmethod
+    def _build_messages(context: str, question: str) -> list[dict]:
+        """Assemble the chat messages sent to the LLM."""
+        return [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}\nAnswer:",
+            },
+        ]
 
     @staticmethod
     def _format_context(results: dict) -> tuple[str, list[str]]:
