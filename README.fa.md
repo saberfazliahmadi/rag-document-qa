@@ -2,6 +2,11 @@
   <img src="assets/rag-blueprint-banner.png" alt="نقشه RAG: اسناد خصوصی از یک پردازشگر هوش مصنوعی عبور می‌کنند و به پاسخ‌های قالب‌بندی‌شده و مستند تبدیل می‌شوند" width="100%">
 </p>
 
+<h3 align="center" dir="rtl">🎥▶ برای درک سریع و آسان پروژه، این ویدیوی معرفی را تماشا کنید :)</h3>
+<p align="center" dir="rtl"><i>🔊 برای شنیدن صدا، روی آیکون بلندگو در پخش‌کننده ویدیو کلیک کنید</i></p>
+
+https://github.com/user-attachments/assets/63233dc2-b4c0-4a37-bab7-29fc8dde2bd9
+
 # سیستم پرسش‌وپاسخ اسنادی RAG
 
 [English](README.md) | **فارسی**
