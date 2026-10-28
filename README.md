@@ -2,6 +2,8 @@
   <img src="assets/rag-blueprint-banner.png" alt="RAG Blueprint: private documents flow through an AI processor and come out as formatted, source-backed answers" width="100%">
 </p>
 
+<h3 align="center">🎥▶ Watch this Project Overview to Understand it Easily &amp; Quickly :)</h3>
+<p align="center"><i>🔊 Click the speaker icon on the video player to unmute</i></p>
 
 https://github.com/user-attachments/assets/63233dc2-b4c0-4a37-bab7-29fc8dde2bd9
 
