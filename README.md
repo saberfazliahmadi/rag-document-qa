@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/rag-blueprint-banner.png" alt="RAG Blueprint: private documents flow through an AI processor and come out as formatted, source-backed answers" width="100%">
+</p>
+
 # RAG Document Q&A
 
 **English** | [فارسی](README.fa.md)
@@ -5,6 +9,14 @@
 [![CI](https://github.com/saberfazliahmadi/rag-document-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/saberfazliahmadi/rag-document-qa/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+<p align="center">
+  <a href="assets/how-rag-document-qa-works.png">
+    <img src="assets/how-rag-document-qa-works.png" alt="Infographic: how RAG Document Q&A works, from preparing documents (loading, cleaning, chunking, embedding, indexing) to answering questions (query embedding, similarity search, prompt construction, grounded LLM answer)" width="100%">
+  </a>
+  <br>
+  <sub><i>How it works, end to end. Click the image to view it full size.</i></sub>
+</p>
 
 **An evaluation-first RAG system.** Ask questions about your own documents and get grounded, source-cited answers — from a pipeline where every architectural decision is measured before it is trusted.
 

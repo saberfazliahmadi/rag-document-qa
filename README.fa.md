@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/rag-blueprint-banner.png" alt="نقشه RAG: اسناد خصوصی از یک پردازشگر هوش مصنوعی عبور می‌کنند و به پاسخ‌های قالب‌بندی‌شده و مستند تبدیل می‌شوند" width="100%">
+</p>
+
 # سیستم پرسش‌وپاسخ اسنادی RAG
 
 [English](README.md) | **فارسی**
@@ -5,6 +9,14 @@
 [![CI](https://github.com/saberfazliahmadi/rag-document-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/saberfazliahmadi/rag-document-qa/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+<p align="center">
+  <a href="assets/how-rag-document-qa-works.png">
+    <img src="assets/how-rag-document-qa-works.png" alt="اینفوگرافیک: نحوه کار پرسش‌وپاسخ اسنادی RAG، از آماده‌سازی اسناد (بارگذاری، پاک‌سازی، قطعه‌بندی، تولید embedding، نمایه‌سازی) تا پاسخ به سؤال‌ها (embedding سؤال، جست‌وجوی شباهت، ساخت پرامپت، پاسخ مستند مدل زبانی)" width="100%">
+  </a>
+  <br>
+  <sub dir="rtl"><i>نحوه کار سیستم، از ابتدا تا انتها. برای مشاهده در اندازه کامل روی تصویر کلیک کنید.</i></sub>
+</p>
 
 <div dir="rtl">
 
